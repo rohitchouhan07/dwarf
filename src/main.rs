@@ -1,5 +1,5 @@
 use std::{fs, error::Error, process};
-use clap::Parser;
+use clap::{Parser, builder::Str};
 
 fn parse_args() -> String {
     #[derive(Parser)]
@@ -12,12 +12,36 @@ fn parse_args() -> String {
     args.file_path
 }
 
-// struct Header {
-//     class: u8,
-//     endian: u8,
-//     version: u8,
-//     abi: u8,
-// }
+#[derive(Debug, Default)]
+enum BinType {
+    #[default]
+    NONE,
+    REL,
+    EXEC,
+    DYN,
+    CORE
+}
+#[derive(Debug, Default)]
+struct Header {
+    class: String,
+    endian: String,
+    version: u8,
+    abi: String,
+    bin_type: BinType,
+    machine: String,
+    misc_version: u32,
+    entry_point: u64,
+    phdr_offset: u64,
+    shdr_offset: u64,
+    flags: u32,
+    hdr_sz: u16,
+    phdr_entry_size: u16,
+    phdr_entries: u16,
+    shdr_entry_sz: u16,
+    shdr_entries: u16,
+    sec_entry_idx: u16
+}
+
 
 fn main(){
     // get the command line arguments like the binary file name
@@ -50,29 +74,7 @@ fn parse_header(content:Vec<u8>) -> Result<(), &'static str> {
     println!("Valid ELF binary.");
     
     // now that we know the it is a valid ELF, we can move ahead
-    if content[4] == 0x1 {
-        println!("32-bit binary");
-    }
-    else {
-        println!("64-bit binary");
-    }
-
-    if content[5] == 0x1 {
-        println!("Little endian");
-    }
-    else {
-        println!("Big endian");
-    }
-
-    println!("Version: {}", content[6]);
-
-    if content[7] == 0x0 {
-        println!("OS ABI: SysV");
-    }
-    else {
-        println!("OS ABI: Unknown");
-    }
-    
-    dbg!(&content[16]);
+    let header: Header = Header {..Default::default()};
+    dbg!(header);
     Ok(())
 }

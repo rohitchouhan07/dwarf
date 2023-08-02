@@ -1,5 +1,6 @@
 use clap::Parser;
 use std::{error::Error, fs, process, str};
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 
 fn parse_args() -> String {
     #[derive(Parser)]
@@ -9,6 +10,7 @@ fn parse_args() -> String {
         file_path: String,
     }
     let args: Args = Args::parse();
+
     args.file_path
 }
 
@@ -20,15 +22,68 @@ enum BinType {
     EXEC,
     DYN,
     CORE,
+    LOOS,
+    HIOS,
+    LOPROC,
+    HIPROC,
 }
+
+#[derive(Debug, Default, PartialEq)]
+enum Class {
+    #[default]
+    NONE,
+    X32Bit,
+    X64Bit,
+} 
+
+#[derive(Debug, Default)]
+enum Endian {
+    #[default]
+    NONE,
+    Little,
+    Big,
+}
+
+#[derive(Debug, Default)]
+enum Abi {
+    #[default]
+    NONE,
+    SystemV,
+    HP_UX,
+    NetBSD,
+    Linux,
+    GNU_Hurd,
+    Solaris,
+    AIX,
+    IRIX,
+    FreeBSD,
+    Tru64,
+    Novell,
+    OpenBSD,
+    OpenVMS,
+    NonStop,
+    AROS,
+    FernixOS,
+    Nuxi,
+    Status,
+}
+
+#[derive(Debug, Default)]
+enum Machine {
+    #[default]
+    NONE,
+    X86,
+    AMD64,
+}
+
 #[derive(Debug, Default)]
 struct Header {
-    class: &'static str,
-    endian: &'static str,
+    class: Class,
+    endian: Endian,
     version: u8,
-    abi: &'static str,
+    abi: Abi,
     bin_type: BinType,
-    machine: &'static str,
+    machine: Machine,
     misc_version: u32,
     entry_point: u64,
     phdr_offset: u64,
@@ -58,11 +113,11 @@ fn run(binary_path: String) -> Result<(), Box<dyn Error>> {
     let content: Vec<u8> = fs::read(binary_path)?;
 
     // we have the contents in a byte array, time to start parsing ELF header
-    parse_header(content)?;
+    parse_header(&content)?;
     Ok(())
 }
 
-fn parse_header(content: Vec<u8>) -> Result<(), &'static str> {
+fn parse_header(content: &Vec<u8>) -> Result<(), &'static str> {
     // first we check whether it a valid ELF file or not
     const MAGIC: [u8; 4] = [0x7f, 0x45, 0x4c, 0x46];
 
@@ -76,56 +131,105 @@ fn parse_header(content: Vec<u8>) -> Result<(), &'static str> {
     let mut header: Header = Header {
         ..Default::default()
     };
+    
+    //cursor
+    let mut cursor: usize = 0x04;
+    let mut width: usize = 0x08;
 
     // reading the class
-    if content[4] == 1 {
-        header.class = "32-bit";
-    } else if content[4] == 2 {
-        header.class = "64-bit";
+    match content[cursor] {
+        1 => {
+            header.class = Class::X32Bit;
+            width = 0x04;    
+        },
+        2 => header.class = Class::X64Bit,
+        _ => header.class = Class::NONE,
     }
+    cursor += 0x01;
 
     // reading endianness
-    if content[5] == 1 {
-        header.endian = "Little";
-    } else if content[5] == 2 {
-        header.endian = "Big";
+    match content[cursor] {
+        1 => header.endian = Endian::Little,
+        2 => header.endian = Endian::Big,
+        _ => header.endian = Endian::NONE,
     }
+    cursor += 0x01;
 
     // read the version
-    header.version = content[6];
+    header.version = content[cursor];
+    cursor += 0x01;
 
     // OS abi
-    if content[7] == 0 {
-        header.abi = "SYS V";
+    match content[cursor] {
+        0 => header.abi = Abi::SystemV,
+        _ => header.abi = Abi::NONE,
     }
+    cursor += 0x09;
 
     // type of binary
-    let bin_type: u16 = (content[16] + content[17] * 16) as u16;
+    let mut bin_type_arr: &[u8] = &content[cursor..(cursor + 0x02)];
+    let bin_type = match header.endian {
+        Endian::Little => bin_type_arr.read_u16::<LittleEndian>().unwrap(),
+        Endian::Big => bin_type_arr.read_u16::<BigEndian>().unwrap(),
+        Endian::NONE => return Err("Endianess of the system not defined."), 
+    };
+
     match bin_type {
         1 => header.bin_type = BinType::REL,
         2 => header.bin_type = BinType::EXEC,
         3 => header.bin_type = BinType::DYN,
         4 => header.bin_type = BinType::CORE,
+        0xFE00 => header.bin_type = BinType::LOOS,
+        0xFEFF => header.bin_type = BinType::HIOS,
+        0xFF00 => header.bin_type = BinType::LOPROC,
+        0xFFFF => header.bin_type = BinType::HIPROC,
         _ => header.bin_type = BinType::NONE,
     }
-
+    cursor += 0x02;
     // machine
-    let machine: u16 = content[18] as u16 + content[19] as u16 * 16;
-    if machine == 0x03 {
-        header.machine = "x86";
-    } else if machine == 0x3E {
-        header.machine = "x86-64";
+    let mut machine_arr: &[u8] = &content[cursor..(cursor + 0x02)];
+    let machine = match header.endian {
+        Endian::Little => machine_arr.read_u16::<LittleEndian>().unwrap(),
+        Endian::Big => machine_arr.read_u16::<BigEndian>().unwrap(),
+        Endian::NONE => return Err("Endianness of the system not defined."),
+
+    };
+    match machine {
+        0x03 => header.machine = Machine::X86,
+        0x3E => header.machine = Machine::AMD64,
+        _ =>  header.machine = Machine::NONE,
     }
+    cursor += 0x02;
+
+    // Another Version
+    cursor += 0x04;
 
     // entry point
-    header.entry_point = content[24] as u64
-        + content[25] as u64 * 16_u64.pow(1)
-        + content[26] as u64 * 16_u64.pow(2)
-        + content[27] as u64 * 16_u64.pow(3)
-        + content[28] as u64 * 16_u64.pow(4)
-        + content[29] as u64 * 16_u64.pow(5)
-        + content[30] as u64 * 16_u64.pow(6)
-        + content[31] as u64 * 16_u64.pow(7);
+    let mut entry_point_arr: &[u8] = match header.class {
+        Class::X32Bit | Class::X64Bit => &content[cursor..(cursor + width)],
+        Class::NONE => return Err("Unknown binary type."),
+    };
+
+    header.entry_point = match header.endian {
+        Endian::Little => {
+            if header.class == Class::X64Bit {
+                entry_point_arr.read_u64::<LittleEndian>().unwrap() 
+            }
+            else {
+                entry_point_arr.read_u32::<LittleEndian>().unwrap() as u64
+            }
+        },
+        Endian::Big => {
+            if header.class == Class::X64Bit {
+                entry_point_arr.read_u64::<BigEndian>().unwrap()
+            } 
+            else {
+                entry_point_arr.read_u32::<BigEndian>().unwrap() as u64
+            }
+        },
+        Endian::NONE => return Err("Endianness of the system not defined."),
+    };
+    cursor += width;
 
     // program header entry point
     header.phdr_offset = content[32] as u64

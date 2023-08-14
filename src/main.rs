@@ -1,6 +1,11 @@
 use clap::Parser;
 use std::{error::Error, fs, process, str};
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
+pub mod header_enums;
+use self::header_enums::{BinType, Class,
+Endian, Abi, Machine};
+pub mod program_header;
+use crate::program_header::parse;
 
 fn parse_args() -> String {
     #[derive(Parser)]
@@ -12,68 +17,6 @@ fn parse_args() -> String {
     let args: Args = Args::parse();
 
     args.file_path
-}
-
-#[derive(Debug, Default)]
-enum BinType {
-    #[default]
-    NONE,
-    REL,
-    EXEC,
-    DYN,
-    CORE,
-    LOOS,
-    HIOS,
-    LOPROC,
-    HIPROC,
-}
-
-#[derive(Debug, Default, PartialEq)]
-enum Class {
-    #[default]
-    NONE,
-    X32Bit,
-    X64Bit,
-} 
-
-#[derive(Debug, Default)]
-enum Endian {
-    #[default]
-    NONE,
-    Little,
-    Big,
-}
-
-#[derive(Debug, Default)]
-enum Abi {
-    #[default]
-    NONE,
-    SystemV,
-    HP_UX,
-    NetBSD,
-    Linux,
-    GNU_Hurd,
-    Solaris,
-    AIX,
-    IRIX,
-    FreeBSD,
-    Tru64,
-    Novell,
-    OpenBSD,
-    OpenVMS,
-    NonStop,
-    AROS,
-    FernixOS,
-    Nuxi,
-    Status,
-}
-
-#[derive(Debug, Default)]
-enum Machine {
-    #[default]
-    NONE,
-    X86,
-    AMD64,
 }
 
 #[derive(Debug, Default)]
@@ -113,12 +56,22 @@ fn main() {
 fn run(binary_path: String) -> Result<(), Box<dyn Error>> {
     let content: Vec<u8> = fs::read(binary_path)?;
 
-    // we have the contents in a byte array, time to start parsing ELF header
-    parse_header(&content)?;
+    // we have the contents 
+    // in a byte array, time to start parsing ELF header
+    
+    let mut header: Header = Header {
+        ..Default::default()
+    };
+    
+    parse_header(&content, &mut header)?;
+    program_header::parse(&content, header.phdr_offset,
+                          header.phdr_entries, header.phdr_entry_sz,
+                          header.class, header.endian)?;
     Ok(())
 }
 
-fn parse_header(content: &Vec<u8>) -> Result<(), &'static str> {
+fn parse_header(content: &Vec<u8>,
+                header: &mut Header) -> Result<(), &'static str> {
     // first we check whether it a valid ELF file or not
     const MAGIC: [u8; 4] = [0x7f, 0x45, 0x4c, 0x46];
 
@@ -128,12 +81,7 @@ fn parse_header(content: &Vec<u8>) -> Result<(), &'static str> {
     }
     println!("Valid ELF binary.");
 
-    // now that we know the it is a valid ELF, we can move ahead
-    let mut header: Header = Header {
-        ..Default::default()
-    };
-    
-    //cursor
+    // cursor
     let mut cursor: usize = 0x04;
     let mut width: usize = 0x08;
     let mut buff: &[u8];
@@ -164,10 +112,10 @@ fn parse_header(content: &Vec<u8>) -> Result<(), &'static str> {
     // OS abi
     match content[cursor] {
         0x00 => header.abi = Abi::SystemV,
-        0x01 => header.abi = Abi::HP_UX,
+        0x01 => header.abi = Abi::HpUX,
         0x02 => header.abi = Abi::NetBSD,
         0x03 => header.abi = Abi::Linux,
-        0x04 => header.abi = Abi::GNU_Hurd,
+        0x04 => header.abi = Abi::GnuHurd,
         0x06 => header.abi = Abi::Solaris,
         0x07 => header.abi = Abi::AIX,
         0x08 => header.abi = Abi::IRIX,
@@ -229,6 +177,12 @@ fn parse_header(content: &Vec<u8>) -> Result<(), &'static str> {
     cursor += 0x02;
 
     // Another Version
+    buff = &content[cursor..(cursor + 0x04)];
+    header.misc_version = match header.endian {
+        Endian::Little => buff.read_u32::<LittleEndian>().unwrap(),
+        Endian::Big => buff.read_u32::<BigEndian>().unwrap(),
+        Endian::NONE => return Err("Endianness of the system not defined."),
+    }; 
     cursor += 0x04;
 
     // entry point

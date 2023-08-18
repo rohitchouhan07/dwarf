@@ -12,7 +12,7 @@ pub enum BinType {
     HIPROC,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Copy, Clone)]
 pub enum Class {
     #[default]
     NONE,
@@ -20,7 +20,7 @@ pub enum Class {
     X64Bit,
 } 
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone)]
 pub enum Endian {
     #[default]
     NONE,

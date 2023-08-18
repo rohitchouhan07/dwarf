@@ -23,5 +23,8 @@ pub enum PFlags {
     X,
     W,
     R,
+    RW,
+    RX,
+    RWX,
 }
 

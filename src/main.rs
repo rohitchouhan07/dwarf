@@ -64,9 +64,14 @@ fn run(binary_path: String) -> Result<(), Box<dyn Error>> {
     };
     
     parse_header(&content, &mut header)?;
-    program_header::parse(&content, header.phdr_offset,
-                          header.phdr_entries, header.phdr_entry_sz,
+    let mut entry: u16 = 0;
+    let mut phdr_offset: u64 = header.phdr_offset;
+    while entry < header.phdr_entries {
+        program_header::parse(&content, phdr_offset,
                           header.class, header.endian)?;
+        entry += 1;
+        phdr_offset += header.phdr_entry_sz as u64;
+    }
     Ok(())
 }
 

@@ -14,6 +14,11 @@ pub enum PType {
     HIOS,
     LOPROC,
     HIPROC,
+    GNU_EH_FRAME,
+    GNU_STACK,
+    GNU_RELRO,
+    GNU_PROPERTY,
+    GNU_SFRAME,
 }
 
 #[derive(Default, Debug)]

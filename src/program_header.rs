@@ -58,6 +58,11 @@ pub fn parse(content: &Vec<u8>,
        0x6FFFFFFF => PType::HIOS,
        0x70000000 => PType::LOPROC,
        0x7FFFFFFF => PType::HIPROC,
+       0x6474e550 => PType::GNU_EH_FRAME,
+       0x6474e551 => PType::GNU_STACK,
+       0x6474e552 => PType::GNU_RELRO,
+       0x6474e553 => PType::GNU_PROPERTY,
+       0x6474e554 => PType::GNU_SFRAME,
        _ => PType::NONE,
     };
     cursor += 0x04;
@@ -70,7 +75,7 @@ pub fn parse(content: &Vec<u8>,
                 buff.read_u32::<LittleEndian>().unwrap()
             },
             Endian::Big => buff.read_u32::<BigEndian>().unwrap(),
-            _ => return Err("TBD")
+            _ => return Err("Undefined Endianess.")
         };
 
         p_header.pflags = match pflags {
@@ -91,7 +96,7 @@ pub fn parse(content: &Vec<u8>,
         Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
             as u64,
         Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
-        _ => return Err("TBD")
+        _ => return Err("Undefined Endianess.")
     };
     cursor += width;
 
@@ -101,7 +106,7 @@ pub fn parse(content: &Vec<u8>,
         Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
             as u64,
         Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
-        _ => return Err("TBD")
+        _ => return Err("Undefined endianess.")
     };
     cursor += width;
 
@@ -111,7 +116,7 @@ pub fn parse(content: &Vec<u8>,
         Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
             as u64,
         Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
-        _ => return Err("TBD")
+        _ => return Err("Undefined endianess.")
     };
     cursor += width;
 
@@ -169,7 +174,6 @@ pub fn parse(content: &Vec<u8>,
     cursor += width;
 
     // end of program header
-
     dbg!(p_header);
     Ok(())
 }

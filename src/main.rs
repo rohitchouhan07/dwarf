@@ -4,11 +4,12 @@ use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 pub mod header_enums;
 use self::header_enums::{BinType, Class, Endian, Abi, Machine};
 pub mod program_header;
-use crate::program_header::parse;
+pub mod section_header;
 
 struct CliArgs {
     file_path: String,
     program_header: bool,
+    section_header: bool,
 }
 
 fn parse_args() -> CliArgs {
@@ -19,12 +20,15 @@ fn parse_args() -> CliArgs {
         file_path: String,
         #[arg(long, short, action)]
         program_header: bool,
+        #[arg(long, short, action)]
+        section_header: bool,
     }
     let args: Args = Args::parse();
 
     CliArgs {
         file_path: args.file_path,
-        program_header: args.program_header
+        program_header: args.program_header,
+        section_header: args.section_header,
     } 
 }
 
@@ -74,15 +78,16 @@ fn run(cli_args: CliArgs) -> Result<(), Box<dyn Error>> {
     
     parse_header(&content, &mut header)?;
     if cli_args.program_header == true {
-        let mut entry: u16 = 0;
+        
         let mut phdr_offset: u64 = header.phdr_offset;
-        while entry < header.phdr_entries {
+        for _ in 0..header.phdr_entries {
             program_header::parse(&content, phdr_offset,
                               header.class, header.endian)?;
-            entry += 1;
             phdr_offset += header.phdr_entry_sz as u64;
         }
     }
+    section_header::parse(&content, header.shdr_offset,
+                          header.class, header.endian)?;
     Ok(())
 }
 

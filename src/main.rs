@@ -2,21 +2,30 @@ use clap::Parser;
 use std::{error::Error, fs, process, str};
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 pub mod header_enums;
-use self::header_enums::{BinType, Class,
-Endian, Abi, Machine};
+use self::header_enums::{BinType, Class, Endian, Abi, Machine};
 pub mod program_header;
 use crate::program_header::parse;
 
-fn parse_args() -> String {
+struct CliArgs {
+    file_path: String,
+    program_header: bool,
+}
+
+fn parse_args() -> CliArgs {
     #[derive(Parser)]
     #[command(author, version, about, long_about = None)]
     struct Args {
         #[arg(long, short)]
         file_path: String,
+        #[arg(long, short, action)]
+        program_header: bool,
     }
     let args: Args = Args::parse();
 
-    args.file_path
+    CliArgs {
+        file_path: args.file_path,
+        program_header: args.program_header
+    } 
 }
 
 #[derive(Debug, Default)]
@@ -43,18 +52,18 @@ struct Header {
 
 fn main() {
     // get the command line arguments like the binary file name
-    let binary_path: String = parse_args();
-    println!("The binary to parse is: {binary_path}");
+    let cli_args: CliArgs = parse_args();
+    println!("The file to be parsed is: {0}", cli_args.file_path);
 
     // Now we need to read the binary ELF file
-    if let Err(e) = run(binary_path) {
+    if let Err(e) = run(cli_args) {
         println!("Error: {e}");
         process::exit(1);
     }
 }
 
-fn run(binary_path: String) -> Result<(), Box<dyn Error>> {
-    let content: Vec<u8> = fs::read(binary_path)?;
+fn run(cli_args: CliArgs) -> Result<(), Box<dyn Error>> {
+    let content: Vec<u8> = fs::read(cli_args.file_path)?;
 
     // we have the contents 
     // in a byte array, time to start parsing ELF header
@@ -64,13 +73,15 @@ fn run(binary_path: String) -> Result<(), Box<dyn Error>> {
     };
     
     parse_header(&content, &mut header)?;
-    let mut entry: u16 = 0;
-    let mut phdr_offset: u64 = header.phdr_offset;
-    while entry < header.phdr_entries {
-        program_header::parse(&content, phdr_offset,
-                          header.class, header.endian)?;
-        entry += 1;
-        phdr_offset += header.phdr_entry_sz as u64;
+    if cli_args.program_header == true {
+        let mut entry: u16 = 0;
+        let mut phdr_offset: u64 = header.phdr_offset;
+        while entry < header.phdr_entries {
+            program_header::parse(&content, phdr_offset,
+                              header.class, header.endian)?;
+            entry += 1;
+            phdr_offset += header.phdr_entry_sz as u64;
+        }
     }
     Ok(())
 }
@@ -82,7 +93,7 @@ fn parse_header(content: &Vec<u8>,
 
     let magic: &[u8] = &content[0..4];
     if MAGIC != magic {
-        return Err("Not an ELF binary");
+        return Err("Not an ELF binary.");
     }
     println!("Valid ELF binary.");
 
@@ -336,7 +347,6 @@ fn parse_header(content: &Vec<u8>,
     };
 
     // end of ELF header
-
     dbg!(header);
     Ok(())
 }

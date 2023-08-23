@@ -20,7 +20,7 @@ pub enum Class {
     X64Bit,
 } 
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, PartialEq, Copy, Clone)]
 pub enum Endian {
     #[default]
     NONE,

@@ -77,6 +77,7 @@ fn run(cli_args: CliArgs) -> Result<(), Box<dyn Error>> {
     };
     
     parse_header(&content, &mut header)?;
+    
     if cli_args.program_header == true {
         
         let mut phdr_offset: u64 = header.phdr_offset;
@@ -86,8 +87,55 @@ fn run(cli_args: CliArgs) -> Result<(), Box<dyn Error>> {
             phdr_offset += header.phdr_entry_sz as u64;
         }
     }
-    section_header::parse(&content, header.shdr_offset,
-                          header.class, header.endian)?;
+
+    if cli_args.section_header == true {
+        
+        let mut shdr_offset: u64 = header.shdr_offset;
+        let strtab_header_start: u64 = header.shdr_offset
+                            + ((header.shstr_idx) as u64
+                            * header.shdr_entry_sz as u64);
+        let strtab_start: u64;
+        if header.class == Class::X32Bit {
+            if header.endian == Endian::Little {
+                let mut buff: &[u8];
+                buff = &content[(strtab_header_start + 0x10) as usize
+                                ..(strtab_header_start + 0x14)
+                                as usize];
+                strtab_start = buff.read_u32::<LittleEndian>().unwrap() as u64;
+            }
+            else {
+                let mut buff: &[u8];
+                buff = &content[(strtab_header_start + 0x10) as usize
+                                ..(strtab_header_start + 0x14)
+                                as usize];
+                strtab_start = buff.read_u32::<BigEndian>().unwrap() as u64;
+            }
+        }
+        else {
+             if header.endian == Endian::Little {
+                let mut buff: &[u8];
+                buff = &content[(strtab_header_start + 0x18) as usize
+                                ..(strtab_header_start + 0x20)
+                                as usize];
+                strtab_start = buff.read_u64::<LittleEndian>().unwrap();
+            }
+            else {
+                let mut buff: &[u8];
+                buff = &content[(strtab_header_start + 0x10) as usize
+                                ..(strtab_header_start + 0x14)
+                                as usize];
+                strtab_start = buff.read_u64::<BigEndian>().unwrap();
+            }           
+        }
+        println!("{strtab_start}");
+        for _ in 0..header.shdr_entries { 
+            section_header::parse(&content, shdr_offset,
+                          header.class, header.endian,
+                          strtab_start)?;     
+            shdr_offset += header.shdr_entry_sz as u64;
+        }
+    }
+    
     Ok(())
 }
 

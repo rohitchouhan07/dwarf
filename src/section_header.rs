@@ -91,111 +91,173 @@ pub fn parse(content: &Vec<u8>,
     };
     cursor += 0x04;
 
-    //// Flags
-    //if class == Class::X64Bit {
-    //    buff = &content[cursor..(cursor + 0x04)];
-    //    let pflags = match endian {
-    //        Endian::Little => {
-    //            buff.read_u32::<LittleEndian>().unwrap()
-    //        },
-    //        Endian::Big => buff.read_u32::<BigEndian>().unwrap(),
-    //        _ => return Err("Undefined Endianess.")
-    //    };
+    // Flags
+    buff = &content[cursor..(cursor + width)];
+    let sflags: u64;
+    if class == Class::X64Bit {
+        sflags = match endian {
+            Endian::Little => buff.read_u64::<LittleEndian>().unwrap(),
+            Endian::Big => buff.read_u64::<BigEndian>().unwrap(),
+            _ => return Err("TBD"),
+        };
+    }
+    else {
+        sflags = match endian {
+            Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
+                as u64,
+            Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
+            _ => return Err("TBD"),
+        };
+    }
+    s_header.sflags = match sflags {
+        0x01 => SFlags::WRITE,
+        0x02 => SFlags::ALLOC,
+        0x04 => SFlags::EXECINSTR,
+        0x10 => SFlags::MERGE,
+        0x20 => SFlags::STRINGS,
+        0x40 => SFlags::INFO_LINK,
+        0x80 => SFlags::LINK_ORDER,
+        0x100 => SFlags::OS_NONCONFORMING,
+        0x200 => SFlags::GROUP,
+        0x400 => SFlags::TLS,
+        0x0ff00000 => SFlags::MASKOS,
+        0xf0000000 => SFlags::MASKPROC,
+        0x4000000 => SFlags::ORDERED,
+        0x8000000 => SFlags::EXCLUDE,
+        0x03 => SFlags::WRTIE_ALLOC,
+        0x06 => SFlags::EXECINSTR_ALLOC,
+        0x30 => SFlags::MERGE_STRINGS,
+        _ => SFlags::NONE,
+    };
+    cursor += width;
 
-    //    p_header.pflags = match pflags {
-    //        0x01 => PFlags::X,
-    //        0x02 => PFlags::W,
-    //        0x04 => PFlags::R,
-    //        0x05 => PFlags::RX,
-    //        0x06 => PFlags::RW,
-    //        0x07 => PFlags::RWX,
-    //        _ => PFlags::NONE,
-    //    };
-    //    cursor += 0x04
-    //}
+    // vaddr
+    buff = &content[cursor..(cursor + width)];
+    s_header.vaddr = match class {
+        Class::X64Bit  => {
+            match endian {
+                Endian::Little => buff.read_u64::<LittleEndian>().unwrap(),
+                Endian::Big => buff.read_u64::<BigEndian>().unwrap(),
+                _ => return Err("TBD"),
+            }
+        },
+        Class::X32Bit => {
+            match endian {
+                Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
+                as u64,
+                Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
+                _ => return Err("TBD"),
+            }
+        },
+        _ => return Err("TBD"),
+    };
+    cursor += width;
 
-    //// offset
-    //buff = &content[cursor..(cursor + width)];
-    //p_header.offset = match endian {
-    //    Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
-    //        as u64,
-    //    Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
-    //    _ => return Err("Undefined Endianess.")
-    //};
-    //cursor += width;
+    // offset
+    buff = &content[cursor..(cursor + width)];
+    s_header.offset = match class {
+        Class::X64Bit  => {
+            match endian {
+                Endian::Little => buff.read_u64::<LittleEndian>().unwrap(),
+                Endian::Big => buff.read_u64::<BigEndian>().unwrap(),
+                _ => return Err("TBD"),
+            }
+        },
+        Class::X32Bit => {
+            match endian {
+                Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
+                as u64,
+                Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
+                _ => return Err("TBD"),
+            }
+        },
+        _ => return Err("TBD"),
+    };
+    cursor += width;
 
-    //// vaddr
-    //buff = &content[cursor..(cursor + width)];
-    //p_header.vaddr = match endian {
-    //    Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
-    //        as u64,
-    //    Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
-    //    _ => return Err("Undefined endianess.")
-    //};
-    //cursor += width;
+    // size
+    buff = &content[cursor..(cursor + width)];
+    s_header.size = match class {
+        Class::X64Bit  => {
+            match endian {
+                Endian::Little => buff.read_u64::<LittleEndian>().unwrap(),
+                Endian::Big => buff.read_u64::<BigEndian>().unwrap(),
+                _ => return Err("TBD"),
+            }
+        },
+        Class::X32Bit => {
+            match endian {
+                Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
+                as u64,
+                Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
+                _ => return Err("TBD"),
+            }
+        },
+        _ => return Err("TBD"),
+    };
+    cursor += width;
+    
+    // link
+    buff = &content[cursor..(cursor + 0x04)];
+    s_header.link = match endian {
+        Endian::Little => buff.read_u32::<LittleEndian>().unwrap(),
+        Endian::Big => buff.read_u32::<BigEndian>().unwrap(),
+        _ => return Err("TBD"),
+    };
+    cursor += 0x04;
 
-   //// paddr
-    //buff = &content[cursor..(cursor + width)];
-    //p_header.paddr = match endian {
-    //    Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
-    //        as u64,
-    //    Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
-    //    _ => return Err("Undefined endianess.")
-    //};
-    //cursor += width;
+    // info
+    buff = &content[cursor..(cursor + 0x04)];
+    s_header.info = match endian {
+        Endian::Little => buff.read_u32::<LittleEndian>().unwrap(),
+        Endian::Big => buff.read_u32::<BigEndian>().unwrap(),
+        _ => return Err("TBD"),
+    };
+    cursor += 0x04;
 
-    //// filesz
-    //buff = &content[cursor..(cursor + width)];
-    //p_header.filesz = match endian {
-    //    Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
-    //        as u64,
-    //    Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
-    //    _ => return Err("TBD")
-    //};
-    //cursor += width;
-
-    //// memsz
-    //buff = &content[cursor..(cursor + width)];
-    //p_header.memsz = match endian {
-    //    Endian::Little => buff.read_u32::<LittleEndian>().unwrap() as
-    //        u64,
-    //    Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
-    //    _ => return Err("TBD")
-    //};
-    //cursor += width;
-
-    //// Flags for 32 bit
-    //if class == Class::X32Bit {
-    //    buff = &content[cursor..(cursor + 0x04)];
-    //    let pflags = match endian {
-    //        Endian::Little => {
-    //            buff.read_u32::<LittleEndian>().unwrap()
-    //        },
-    //        Endian::Big => buff.read_u32::<BigEndian>().unwrap(),
-    //        _ => return Err("TBD")
-    //    };
-
-    //    p_header.pflags = match pflags {
-    //        0x01 => PFlags::X,
-    //        0x02 => PFlags::W,
-    //        0x04 => PFlags::R,
-    //        0x05 => PFlags::RX,
-    //        0x06 => PFlags::RW,
-    //        0x07 => PFlags::RWX,
-    //        _ => PFlags::NONE,
-    //    };
-    //    cursor += 0x04
-    //}
-
-    //// align
-    //buff = &content[cursor..(cursor + width)];
-    //p_header.align = match endian {
-    //    Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
-    //        as u64,
-    //    Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
-    //    _ => return Err("TBD")
-    //};
-    //cursor += width;
+    // align
+    buff = &content[cursor..(cursor + width)];
+    s_header.align = match class {
+        Class::X64Bit  => {
+            match endian {
+                Endian::Little => buff.read_u64::<LittleEndian>().unwrap(),
+                Endian::Big => buff.read_u64::<BigEndian>().unwrap(),
+                _ => return Err("TBD"),
+            }
+        },
+        Class::X32Bit => {
+            match endian {
+                Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
+                as u64,
+                Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
+                _ => return Err("TBD"),
+            }
+        },
+        _ => return Err("TBD"),
+    };
+    cursor += width;
+   
+    // entsize
+    buff = &content[cursor..(cursor + width)];
+    s_header.entsize = match class {
+        Class::X64Bit  => {
+            match endian {
+                Endian::Little => buff.read_u64::<LittleEndian>().unwrap(),
+                Endian::Big => buff.read_u64::<BigEndian>().unwrap(),
+                _ => return Err("TBD"),
+            }
+        },
+        Class::X32Bit => {
+            match endian {
+                Endian::Little => buff.read_u32::<LittleEndian>().unwrap()
+                as u64,
+                Endian::Big => buff.read_u32::<BigEndian>().unwrap() as u64,
+                _ => return Err("TBD"),
+            }
+        },
+        _ => return Err("TBD"),
+    };
+    cursor += width;
 
     // end of program header
     dbg!(s_header);
